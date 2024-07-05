@@ -25,14 +25,10 @@ const tokenize = (text: string) => {
 
 const getMatches = async (tokens: string[]) => {
   const matches: MatchItemDictType = {};
+  for await (const tableData of TableDataEnum) {
+    matches[TableTypeDict[tableData.tableName]] = [];
 
-  for await (const token of tokens) {
-    matches[token] = [];
-
-    for await (const tableData of TableDataEnum) {
-      console.log("searchTerm >>>", token);
-      console.log("tableData >>>", tableData.tableName);
-
+    for await (const token of tokens) {
       const result = await searchEntity(
         token,
         tableData.searchTableName,
@@ -40,8 +36,7 @@ const getMatches = async (tokens: string[]) => {
       );
       console.log(result);
       result.forEach((row) => {
-        matches[token].push({
-          type: TableTypeDict[tableData.tableName],
+        matches[TableTypeDict[tableData.tableName]].push({
           id: row.id,
           name: row.name,
         });
@@ -53,31 +48,41 @@ const getMatches = async (tokens: string[]) => {
 };
 
 const generateCombinations = (matches: MatchItemDictType) => {
-  console.log("mactches ??? ", matches);
   const keys = Object.keys(matches);
   const combinations: CombinationType[] = [];
 
   const recurse = (index: number, currentCombination: CombinationType) => {
-    console.log(index);
     if (index === keys.length) {
       combinations.push(currentCombination);
       return;
     }
 
-    const term = keys[index];
-    for (const match of matches[term]) {
+    const type = keys[index];
+
+    if (matches[type].length === 0) {
+      recurse(index + 1, currentCombination);
+      return;
+    }
+
+    for (const match of matches[type]) {
       const newCombination = { ...currentCombination };
 
-      if (!newCombination[match.type]) {
+      if (!newCombination[type]) {
+        newCombination[type] = { id: match.id, name: match.name };
         if (
-          (match.type === "brand" &&
-            Object.keys(newCombination).includes("dishType")) ||
-          (match.type === "dishType" &&
-            Object.keys(newCombination).includes("brand"))
-        )
-          continue;
-        newCombination[match.type] = { id: match.id, name: match.name };
-        recurse(index + 1, newCombination);
+          Object.keys(newCombination).includes("brand") &&
+          Object.keys(newCombination).includes("dishType")
+        ) {
+          const tmpNewCombination1 = { ...newCombination };
+          delete tmpNewCombination1.brand;
+          recurse(index + 1, tmpNewCombination1);
+
+          const tmpNewCombination2 = { ...newCombination };
+          delete tmpNewCombination2.dishType;
+          recurse(index + 1, tmpNewCombination2);
+        } else {
+          recurse(index + 1, newCombination);
+        }
       }
     }
   };

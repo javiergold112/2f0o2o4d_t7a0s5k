@@ -4,7 +4,6 @@ export interface TableItemType {
 }
 
 export interface MatchItemType {
-  type: string;
   id: number;
   name: string;
 }
